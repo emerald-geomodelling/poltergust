@@ -19,6 +19,14 @@ def make_environment(envpath, environment):
 class RunTask(luigi.Task):
     path = luigi.Parameter()
 
+    @property
+    def scheduler(self):
+        return self.set_progress_percentage.__self__._scheduler
+
+    @property
+    def scheduler_url(self):
+        return self.scheduler._url
+    
     def run(self):
         with luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,)).open("r") as f:
             task = yaml.load(f, Loader=yaml.SafeLoader)
@@ -35,10 +43,11 @@ class RunTask(luigi.Task):
         task_args.pop("environment", None)
         command = task_args.pop("command", None)
         task_name = task_args.pop("task", None)
-
+        task_args["scheduler-url"] = self.scheduler_url
+        
         scope["task_name"] = task_name
         scope["task_args"] = task_args
-        
+
         if command is None:
             command = "+luigi(task_name, **task_args)"
         

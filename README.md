@@ -6,7 +6,7 @@ installed automatically in virtualenvs on each worker.
 
 # Files used by the Poltergust task runner
 
-`gs://mybucket/pipeline/mypipeline/config.yaml`:
+`gs://mybucket/pipeline/mypipeline.config.yaml`:
 ```
 environment: gs://mybucket/environment/myenv.yaml
 
@@ -35,6 +35,14 @@ task name, and any other arguments to give to the luigi command (with
 `--` removed). Note: You probably want to specify the same
 `scheduler-url` here as you did when running the Poltergust task
 runner.
+
+When a task is done, the task config file will be moved from
+
+`gs://mybucket/pipeline/mypipeline.config.yaml`
+
+to
+
+`gs://mybucket/pipeline/mypipeline.done.yaml`
 
 # Instantiating the task runner
 

@@ -9,7 +9,6 @@ import luigi.mock
 import pieshell
 
 def make_environment(envpath, environment):
-    if os.path.exists(envpath): return
     _ = pieshell.env(exports=dict(pieshell.env._exports))
     if not os.path.exists(envpath):
         +_.virtualenv(envpath, **environment.get("virtualenv", {}))
@@ -21,7 +20,7 @@ class RunTask(luigi.Task):
     path = luigi.Parameter()
 
     def run(self):
-        with luigi.contrib.gcs.GCSTarget('%s/config.yaml' % (self.path,)).open("r") as f:
+        with luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,)).open("r") as f:
             task = yaml.load(f, Loader=yaml.SafeLoader)
             
         with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
@@ -45,12 +44,12 @@ class RunTask(luigi.Task):
         
         eval(command, scope)
 
-        with self.output().open("w") as f:
-            f.write("DONE")
+        c = luigi.contrib.gcs.GCSClient()
+        c.move('%s.config.yaml' % (self.path,), '%s.done.yaml' % (self.path,))
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(
-             '%s/status.done' % (self.path,),
+             '%s.done.yaml' % (self.path,),
              format=None, client=None)
         
 class RunTasks(luigi.Task):
@@ -58,11 +57,8 @@ class RunTasks(luigi.Task):
     
     def run(self):
         c = luigi.contrib.gcs.GCSClient()
-        for path in c.list_wildcard('%s/*' % (self.path,)):
-            if path.endswith("/config.yaml"):
-                path = path.rsplit("/", 1)[0]
-                if not c.exists(path + "/status.done"):
-                    yield RunTask(path)
+        for path in c.list_wildcard('%s/*.config.yaml' % (self.path,)):
+            yield RunTask(path.replace(".config.yaml", ""))
     
     def output(self):
         return luigi.mock.MockTarget('/dummy')

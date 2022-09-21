@@ -4,12 +4,15 @@ Trigger [Luigi](https://luigi.readthedocs.io/en/stable/) tasks on multiple worke
 machines. Python modules for tasks and their dependencies are
 installed automatically in virtualenvs on each worker.
 
-Files used by the task runner:
+# Files used by the Poltergust task runner
 
 `gs://mybucket/pipeline/mypipeline/config.yaml`:
 ```
 environment: gs://mybucket/environment/myenv.yaml
-command: +luigi("--module=some_luigi_pipeline_module", "SomeTask")
+
+task: SomeTask
+module: some_luigi_pipeline_module
+some-task-argument: some-value
 ```
 
 `gs://mybucket/environment/myenv.yaml`:
@@ -26,3 +29,13 @@ arguments specified (--python=python3.8), and a set of dependencies to
 be installed using pip. Each dependency will be installed inside the
 virtualenv with pip install, using the verbatim dependency string
 given.
+
+A task file specifies an environment to run the task in, a luigi root
+task name, and any other arguments to give to the luigi command (with
+`--` removed). Note: You probably want to specify the same
+`scheduler-url` here as you did when running the Poltergust task
+runner.
+
+# Instantiating the task runner
+
+luigi RunTasks --module poltergust --path=gs://mybucket/pipeline

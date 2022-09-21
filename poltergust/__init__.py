@@ -8,31 +8,8 @@ import luigi.format
 import luigi.mock
 import pieshell
 
-"""
-Files used by the task runner:
-
---{gs://mybucket/pipeline/mypipeline/config.yaml}--
-environment: gs://mybucket/environment/myenv.yaml
-command: +luigi("--module=some_luigi_pipeline_module", "SomeTask")
---{end of file}--
-
---{gs://mybucket/environment/myenv.yaml}--
-virtualenv:
-  python: python3.8
-dependencies:
-  - pandas
-  - matplotlib
---{end of file}--
-
-An environment file specifies a virtualenv to be created, with the
-arguments specified (--python=python3.8), and a set of dependencies to
-be installed using pip. Each dependency will be installed inside the
-virtualenv with pip install, using the verbatim dependency string
-given.
-"""
-
-
 def make_environment(envpath, environment):
+    if os.path.exists(envpath): return
     _ = pieshell.env(exports=dict(pieshell.env._exports))
     if not os.path.exists(envpath):
         +_.virtualenv(envpath, **environment.get("virtualenv", {}))
@@ -53,8 +30,21 @@ class RunTask(luigi.Task):
         envpath = os.path.join("/tmp/environments", task["environment"].replace("://", "/"))
         make_environment(envpath, environment)
 
-        eval(task["command"], pieshell.environ.EnvScope(env=pieshell.env(envpath, interactive=True)))
-            
+        scope = pieshell.environ.EnvScope(env=pieshell.env(envpath, interactive=True))
+        
+        task_args = dict(task)
+        task_args.pop("environment", None)
+        command = task_args.pop("command", None)
+        task_name = task_args.pop("task", None)
+
+        scope["task_name"] = task_name
+        scope["task_args"] = task_args
+        
+        if command is None:
+            command = "+luigi(task_name, **task_args)"
+        
+        eval(command, scope)
+
         with self.output().open("w") as f:
             f.write("DONE")
 

@@ -44,24 +44,22 @@ class RunTask(luigi.Task):
         
         eval(command, scope)
 
-        c = luigi.contrib.gcs.GCSClient()
-        c.move('%s.config.yaml' % (self.path,), '%s.done.yaml' % (self.path,))
+        self.output().fs.move('%s.config.yaml' % (self.path,), '%s.done.yaml' % (self.path,))
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(
-             '%s.done.yaml' % (self.path,),
-             format=None, client=None)
+             '%s.done.yaml' % (self.path,))
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
     
     def run(self):
-        c = luigi.contrib.gcs.GCSClient()
-        for path in c.list_wildcard('%s/*.config.yaml' % (self.path,)):
+        for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,)):
             yield RunTask(path.replace(".config.yaml", ""))
     
     def output(self):
-        return luigi.mock.MockTarget('/dummy')
+        # This target should never actually be created...
+        return luigi.contrib.gcs.GCSTarget('%s/done' % (self.path,))
     
 
 # luigi --module emerald_algorithms_evaluation.luigi Pipeline --param-evaluation_name=test-luigi-redhog-1

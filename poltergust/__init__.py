@@ -1,4 +1,4 @@
-import os
+import os.path
 import yaml
 import sys
 import traceback
@@ -11,6 +11,9 @@ import pieshell
 def make_environment(envpath, environment):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
     if not os.path.exists(envpath):
+        envdir = os.path.dirname(envpath)
+        if not os.path.exists(envdir):
+            os.makedirs(envdir)
         +_.virtualenv(envpath, **environment.get("virtualenv", {}))
     +_.bashsource(envpath + "/bin/activate")
     for dep in environment["dependencies"]:

@@ -46,11 +46,12 @@ class RunTask(luigi.Task):
         +_.bashsource(envpath + "/bin/activate")
 
         _._exports.update(environment.get("variables", {}))
+        _._exports.update(task.get("variables", {}))
         
-        task_args = dict(task)
-        task_args.pop("environment", None)
-        command = task_args.pop("command", None)
-        task_name = task_args.pop("task", None)
+        command = task.get("command", None)
+
+        task_args = dict(task.get("task", {}))
+        task_name = task_args.pop("name", None)
         task_args["scheduler-url"] = self.scheduler_url
         
         if command is None:

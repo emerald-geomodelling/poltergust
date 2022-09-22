@@ -10,18 +10,24 @@ installed automatically in virtualenvs on each worker.
 ```
 environment: gs://mybucket/environment/myenv.yaml
 
-task: SomeTask
-module: some_luigi_pipeline_module
-some-task-argument: some-value
+task:
+  name: SomeTask
+  module: some_luigi_pipeline_module
+  some-task-argument: some-value
+
+variables:
+  DB_HOST: database.com
 ```
 
 `gs://mybucket/environment/myenv.yaml`:
 ```
 virtualenv:
   python: python3.8
+
 dependencies:
   - pandas
   - matplotlib
+  
 variables:
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 ```
@@ -30,11 +36,16 @@ An environment file specifies a virtualenv to be created, with the
 arguments specified (--python=python3.8), and a set of dependencies to
 be installed using pip. Each dependency will be installed inside the
 virtualenv with pip install, using the verbatim dependency string
-given. It can optionally also specify environment variables to be set.
+given. It can optionally also specify environment variables to be set
+using the key `variables`.
 
 A task file specifies an environment to run the task in, a luigi root
 task name, and any other arguments to give to the luigi command (with
-`--` removed). Note: `--scheduler-url` will be automatically added.
+`--` removed). Note: `--scheduler-url` will be automatically added. It
+can optionally also specify environment variables to be set using the
+key `variables`.
+
+
 
 When a task is done on a machine, a flag file
 

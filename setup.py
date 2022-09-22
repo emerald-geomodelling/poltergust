@@ -17,6 +17,9 @@ installed automatically in virtualenvs on each worker.
     packages=setuptools.find_packages(),
     install_requires=[
         "luigi",
-        "pieshell"
+        "pieshell",
+        "pyyaml",
+        "google-auth",
+        "google-api-python-client",
     ],
 )

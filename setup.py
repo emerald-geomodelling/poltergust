@@ -19,6 +19,7 @@ installed automatically in virtualenvs on each worker.
         "luigi",
         "pieshell",
         "pyyaml",
+        "virtualenv",
         "google-auth",
         "google-api-python-client",
     ],

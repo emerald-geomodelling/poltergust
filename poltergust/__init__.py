@@ -67,7 +67,7 @@ class RunTask(luigi.Task):
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(
-             '%s.%s.done.yaml' % (self.path, self.hostname))
+             '%s.%s.done' % (self.path, self.hostname))
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()

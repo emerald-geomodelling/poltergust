@@ -40,7 +40,8 @@ class RunTask(luigi.Task):
         envpath = os.path.join("/tmp/environments", task["environment"].replace("://", "/"))
         make_environment(envpath, environment)
 
-        scope = pieshell.environ.EnvScope(env=pieshell.env(envpath, interactive=True))
+        _ = pieshell.env(envpath, interactive=True)
+        +_.bashsource(envpath + "/bin/activate")
         
         task_args = dict(task)
         task_args.pop("environment", None)
@@ -48,11 +49,12 @@ class RunTask(luigi.Task):
         task_name = task_args.pop("task", None)
         task_args["scheduler-url"] = self.scheduler_url
         
-        scope["task_name"] = task_name
-        scope["task_args"] = task_args
-
         if command is None:
             command = "+luigi(task_name, **task_args)"
+
+        scope = pieshell.environ.EnvScope(env=_)
+        scope["task_name"] = task_name
+        scope["task_args"] = task_args
         
         eval(command, scope)
 

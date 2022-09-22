@@ -42,6 +42,8 @@ class RunTask(luigi.Task):
 
         _ = pieshell.env(envpath, interactive=True)
         +_.bashsource(envpath + "/bin/activate")
+
+        _._exports.update(environment.get("variables", {}))
         
         task_args = dict(task)
         task_args.pop("environment", None)
@@ -55,7 +57,7 @@ class RunTask(luigi.Task):
         scope = pieshell.environ.EnvScope(env=_)
         scope["task_name"] = task_name
         scope["task_args"] = task_args
-        
+
         eval(command, scope)
 
         self.output().fs.move('%s.config.yaml' % (self.path,), '%s.done.yaml' % (self.path,))

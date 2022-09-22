@@ -7,6 +7,7 @@ import luigi.contrib.gcs
 import luigi.format
 import luigi.mock
 import pieshell
+import socket
 
 def make_environment(envpath, environment):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
@@ -21,6 +22,7 @@ def make_environment(envpath, environment):
 
 class RunTask(luigi.Task):
     path = luigi.Parameter()
+    hostname = luigi.Parameter()
 
     @property
     def scheduler(self):
@@ -60,17 +62,18 @@ class RunTask(luigi.Task):
 
         eval(command, scope)
 
-        self.output().fs.move('%s.config.yaml' % (self.path,), '%s.done.yaml' % (self.path,))
+        with self.output().open("w") as f:
+            f.write("DONE")
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(
-             '%s.done.yaml' % (self.path,))
+             '%s.%s.done.yaml' % (self.path, self.hostname))
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
 
     def requires(self):
-        return [RunTask(path.replace(".config.yaml", ""))
+        return [RunTask(path=path.replace(".config.yaml", ""), hostname=socket.gethostname())
                 for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
 
     def run(self):

@@ -4,7 +4,7 @@ Trigger [Luigi](https://luigi.readthedocs.io/en/stable/) tasks on multiple worke
 machines. Python modules for tasks and their dependencies are
 installed automatically in virtualenvs on each worker.
 
-# Files used by the Poltergust task runner
+## Files used by the Poltergust task runner
 
 `gs://mybucket/pipeline/mypipeline.config.yaml`:
 ```
@@ -22,28 +22,41 @@ virtualenv:
 dependencies:
   - pandas
   - matplotlib
+variables:
+  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 ```
 
 An environment file specifies a virtualenv to be created, with the
 arguments specified (--python=python3.8), and a set of dependencies to
 be installed using pip. Each dependency will be installed inside the
 virtualenv with pip install, using the verbatim dependency string
-given.
+given. It can optionally also specify environment variables to be set.
 
 A task file specifies an environment to run the task in, a luigi root
 task name, and any other arguments to give to the luigi command (with
-`--` removed). Note: You probably want to specify the same
-`scheduler-url` here as you did when running the Poltergust task
-runner.
+`--` removed). Note: `--scheduler-url` will be automatically added.
 
-When a task is done, the task config file will be moved from
+When a task is done on a machine, a flag file
 
-`gs://mybucket/pipeline/mypipeline.config.yaml`
+`gs://mybucket/pipeline/mypipeline.HOSTNAME.done`
 
-to
+is created.
 
-`gs://mybucket/pipeline/mypipeline.done.yaml`
-
-# Instantiating the task runner
+## Instantiating the task runner manually on a single machine
 
 luigi RunTasks --module poltergust --path=gs://mybucket/pipeline
+
+## Creating a cluster
+
+### Google DataProc
+
+To create a cluster with 2 nodes and the name `mycluster`:
+```
+cd clusters
+gsutil mb gs://mycluster
+./dataproc-create-cluster.sh mycluster 2
+```
+
+The above will open an ssh connection to the master node after creating the cluster, forwarding port 8082, so that you can view the cluster status
+in a browser at http://localhost:8082
+

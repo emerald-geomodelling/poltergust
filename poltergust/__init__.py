@@ -68,10 +68,13 @@ class RunTask(luigi.Task):
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
-    
+
+    def requires(self):
+        return [RunTask(path.replace(".config.yaml", ""))
+                for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
+
     def run(self):
-        for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,)):
-            yield RunTask(path.replace(".config.yaml", ""))
+        pass
     
     def output(self):
         # This target should never actually be created...

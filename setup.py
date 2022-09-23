@@ -3,7 +3,7 @@
 import setuptools
 
 setuptools.setup(
-    name='poltergust',
+    name='luigi-poltergust',
     version='0.0.1',
     description='Task trigger for Luigi',
     long_description='''Trigger Luigi tasks on multiple worker

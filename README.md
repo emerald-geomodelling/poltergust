@@ -45,13 +45,10 @@ task name, and any other arguments to give to the luigi command (with
 can optionally also specify environment variables to be set using the
 key `variables`.
 
-
-
-When a task is done on a machine, a flag file
-
-`gs://mybucket/pipeline/mypipeline.HOSTNAME.done`
-
-is created.
+When a task is done `gs://mybucket/pipeline/mypipeline.config.yaml` is
+renamed to `gs://mybucket/pipeline/mypipeline.done.yaml` (since a task
+is run on multiple nodes: the first one to mark the task as done renames
+the file).
 
 ## Instantiating the task runner manually on a single machine
 

@@ -25,7 +25,6 @@ gcloud dataproc clusters create "$NAME" \
 
 gcloud compute ssh \
   --zone "europe-north1-a" \
-  --project "united-column-273409" \
   "${NAME}-m" \
   -- \
   -L 8082:localhost:8082

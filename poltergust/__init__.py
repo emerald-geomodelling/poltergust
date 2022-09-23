@@ -6,6 +6,7 @@ import luigi
 import luigi.contrib.gcs
 import luigi.format
 import luigi.mock
+import luigi.local_target
 import pieshell
 import socket
 
@@ -30,7 +31,7 @@ class MakeEnvironment(luigi.Task):
         make_environment(self.output().path, environment)
         
     def output(self):
-        return luigi.target.LocalTarget(
+        return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/")))
         
 class RunTask(luigi.Task):

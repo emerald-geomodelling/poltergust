@@ -51,7 +51,7 @@ class RunTask(luigi.Task):
             task = yaml.load(f, Loader=yaml.SafeLoader)
 
         environment = yield MakeEnvironment(path=task["environment"], hostname=self.hostname)
-        envpath = environment.output().path
+        envpath = environment.path
 
         _ = pieshell.env(envpath, interactive=True)
         +_.bashsource(envpath + "/bin/activate")

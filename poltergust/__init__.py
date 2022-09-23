@@ -20,10 +20,23 @@ def make_environment(envpath, environment):
     for dep in environment["dependencies"]:
         +_.pip.install(dep)
 
-class RunTask(luigi.Task):
+class MakeEnvironment(luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
 
+    def run(self):
+        with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
+            environment = yaml.load(f, Loader=yaml.SafeLoader)        
+        make_environment(self.output().path, environment)
+        
+    def output(self):
+        return luigi.target.FileSystemTarget(
+            os.path.join("/tmp/environments", self.path.replace("://", "/")))
+        
+class RunTask(luigi.Task):
+    path = luigi.Parameter()
+    hostname = luigi.Parameter()
+    
     @property
     def scheduler(self):
         return self.set_progress_percentage.__self__._scheduler
@@ -35,12 +48,9 @@ class RunTask(luigi.Task):
     def run(self):
         with luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,)).open("r") as f:
             task = yaml.load(f, Loader=yaml.SafeLoader)
-            
-        with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
-            environment = yaml.load(f, Loader=yaml.SafeLoader)
-            
-        envpath = os.path.join("/tmp/environments", task["environment"].replace("://", "/"))
-        make_environment(envpath, environment)
+
+        environment = yield MakeEnvironment(path=task["environment"], hostname=self.hostname)
+        envpath = environment.output().path
 
         _ = pieshell.env(envpath, interactive=True)
         +_.bashsource(envpath + "/bin/activate")
@@ -63,12 +73,19 @@ class RunTask(luigi.Task):
 
         eval(command, scope)
 
-        with self.output().open("w") as f:
-            f.write("DONE")
+        fs = self.output().fs
+        src = '%s.config.yaml' % (self.path,)
+        dst = '%s.done.yaml' % (self.path,)
+        try:
+            fs.move(src, dst)
+        except:
+            # Might already have been moved by another node...
+            pass
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(
-             '%s.%s.done' % (self.path, self.hostname))
+             '%s.done.yaml' % (self.path,))
+
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()

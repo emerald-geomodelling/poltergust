@@ -9,8 +9,6 @@ NRWORKERS="$2"
 gsutil cp dataproc-initactions.sh "gs://${NAME}/initactions.sh"
 
 gcloud dataproc clusters create "$NAME" \
-  --region europe-north1 \
-  --zone europe-north1-a \
   --master-machine-type n1-standard-4 \
   --worker-machine-type n1-standard-4 \
   --initialization-actions "gs://${NAME}/initactions.sh" \

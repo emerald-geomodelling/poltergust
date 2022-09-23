@@ -30,7 +30,7 @@ class MakeEnvironment(luigi.Task):
         make_environment(self.output().path, environment)
         
     def output(self):
-        return luigi.target.FileSystemTarget(
+        return luigi.target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/")))
         
 class RunTask(luigi.Task):

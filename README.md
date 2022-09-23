@@ -4,6 +4,8 @@ Trigger [Luigi](https://luigi.readthedocs.io/en/stable/) tasks on multiple worke
 machines. Python modules for tasks and their dependencies are
 installed automatically in virtualenvs on each worker.
 
+## Motivation & design
+
 The [Luigi documentation](https://luigi.readthedocs.io/en/stable/execution_model.html#workers-and-task-execution) states that
 
 > The most important aspect is that no execution is transferred. When you run a Luigi workflow, the worker schedules all tasks,
@@ -16,6 +18,10 @@ The [Luigi documentation](https://luigi.readthedocs.io/en/stable/execution_model
 However, in practice this is what makes deployment *hard* since you have to figure ut a way to install dependencies and code and to trigger your tasks on your worker nodes somehow. For non repeating pipelines (daily etc), this becomes increasingly complex.
 
 Poltergust takes care of this for you! You run the poltergust main task on a set of machines (restarting it as soon as it finishes), and can then submit tasks to be run using files. These tasks consists of a luigi task to be run as well as the code to run it and any dependencies to be installed.
+
+## Limitations and requirements
+
+Poltergust currently only supports GCSTargets (and thus gs:// url:s) for its files and so requires Google Cloud Storage. 
 
 ## Files used by the Poltergust task runner
 

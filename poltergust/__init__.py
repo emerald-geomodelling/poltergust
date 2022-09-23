@@ -49,9 +49,12 @@ class RunTask(luigi.Task):
     def run(self):
         with luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,)).open("r") as f:
             task = yaml.load(f, Loader=yaml.SafeLoader)
+            
+        with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
+            environment = yaml.load(f, Loader=yaml.SafeLoader)        
 
-        environment = yield MakeEnvironment(path=task["environment"], hostname=self.hostname)
-        envpath = environment.path
+        envpath = yield MakeEnvironment(path=task["environment"], hostname=self.hostname)
+        envpath = envpath.path
 
         _ = pieshell.env(envpath, interactive=True)
         +_.bashsource(envpath + "/bin/activate")

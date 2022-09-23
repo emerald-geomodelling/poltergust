@@ -47,9 +47,16 @@ class RunTask(luigi.Task):
         return self.scheduler._url
     
     def run(self):
-        with luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,)).open("r") as f:
-            task = yaml.load(f, Loader=yaml.SafeLoader)
-            
+        cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
+        try:
+            with cfg.open("r") as f:
+                task = yaml.load(f, Loader=yaml.SafeLoader)
+        except:
+            if not cfg.fs.exists(cfg.path):
+                # The task has already been marked as done by another worker.
+                return
+            raise
+                
         with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
             environment = yaml.load(f, Loader=yaml.SafeLoader)        
 

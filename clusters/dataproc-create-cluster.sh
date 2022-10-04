@@ -6,6 +6,7 @@ echo $NAME
 NRWORKERS="$2"
 [ -n "$NRWORKERS" ] || NRWORKERS=3
 
+gsutil mb "gs://${NAME}"
 gsutil cp dataproc-initactions.sh "gs://${NAME}/initactions.sh"
 
 gcloud dataproc clusters create "$NAME" \

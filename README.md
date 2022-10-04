@@ -15,7 +15,7 @@ The [Luigi documentation](https://luigi.readthedocs.io/en/stable/execution_model
 > deployment a non-event. During development, you typically run the Luigi workflow from the command line, whereas when you deploy it,
 > you can trigger it using crontab or any other scheduler.
 
-However, in practice this is what makes deployment *hard* since you have to figure ut a way to install dependencies and code and to trigger your tasks on your worker nodes somehow. For non repeating pipelines (daily etc), this becomes increasingly complex.
+However, in practice this is what makes deployment *hard* since you have to figure out a way to install dependencies and code and to trigger your tasks on your worker nodes somehow. For non repeating pipelines (daily etc), this becomes increasingly complex.
 
 Poltergust takes care of this for you! You run the poltergust main task on a set of machines (restarting it as soon as it finishes), and can then submit tasks to be run using files. These tasks consists of a luigi task to be run as well as the code to run it and any dependencies to be installed.
 

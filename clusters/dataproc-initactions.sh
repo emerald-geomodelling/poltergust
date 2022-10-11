@@ -57,7 +57,7 @@ EOF
 source /pythonenv/bin/activate
 
 while true; do
-  luigi RunTasks --module poltergust --path="${PIPELINE_URL}" --scheduler-url="http://${MASTER}:8082/"
+  luigi RunTasks --module poltergust --hostname="$(hostname -f)" --path="${PIPELINE_URL}" --scheduler-url="http://${MASTER}:8082/"
   sleep 1
 done
 EOF

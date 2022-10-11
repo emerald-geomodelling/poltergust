@@ -8,7 +8,6 @@ import luigi.format
 import luigi.mock
 import luigi.local_target
 import pieshell
-import socket
 
 def make_environment(envpath, environment):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
@@ -106,9 +105,10 @@ class RunTask(luigi.Task):
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
+    hostname = luigi.Parameter()
 
     def requires(self):
-        return [RunTask(path=path.replace(".config.yaml", ""), hostname=socket.gethostname())
+        return [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
                 for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
 
     def run(self):

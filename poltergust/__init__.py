@@ -74,6 +74,12 @@ class RunTask(luigi.Task):
         task_args = dict(task.get("task", {}))
         task_name = task_args.pop("name", None)
         task_args["scheduler-url"] = self.scheduler_url
+        task_args["retcode-already-running"] = 10
+        task_args["retcode-missing-data"] = 20
+        task_args["retcode-not-run"] = 25
+        task_args["retcode-task-failed"] = 30
+        task_args["retcode-scheduling-error"] = 35
+        task_args["retcode-unhandled-exception"] = 40
         
         if command is None:
             command = "+luigi(task_name, **task_args)"

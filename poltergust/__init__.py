@@ -8,6 +8,7 @@ import luigi.format
 import luigi.mock
 import luigi.local_target
 import pieshell
+import time
 
 def make_environment(envpath, environment):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
@@ -87,8 +88,20 @@ class RunTask(luigi.Task):
         scope["task_name"] = task_name
         scope["task_args"] = task_args
 
-        eval(command, scope)
-
+        # Rerun the task until it is actually being run (or is done!)
+        # We need to do this, since luigi might exit because all
+        # dependencies of a task are already being run by other
+        # workers, and our task can't even start...
+        while True:
+            try:
+                eval(command, scope)
+            except pieshell.PipelineFailed as e:
+                if e.pipeline.exit_code <= 25:
+                    time.sleep(5)
+                    continue
+                raise
+            break
+            
         fs = self.output().fs
         src = '%s.config.yaml' % (self.path,)
         dst = '%s.done.yaml' % (self.path,)

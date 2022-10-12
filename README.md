@@ -73,7 +73,7 @@ the file).
 
 ```
 while true; do
-  luigi RunTasks --module poltergust --path=gs://mybucket/pipeline
+  luigi RunTasks --module poltergust --hostname="$(hostname -f)" --path=gs://mybucket/pipeline
   sleep 1
 done
 ```

@@ -96,6 +96,7 @@ class RunTask(luigi.Task):
             try:
                 eval(command, scope)
             except pieshell.PipelineFailed as e:
+                print(e)
                 if e.pipeline.exit_code <= 25:
                     time.sleep(5)
                     continue

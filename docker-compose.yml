@@ -8,7 +8,8 @@ services:
     environment:
       - PIPELINE_URL=gs://mybucket/pipeline
       - SCHEDULER_URL=http://scheduler:8082
-      
+    deploy:
+      replicas: 1
   scheduler:
     image: spotify/luigi
     ports:

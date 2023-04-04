@@ -92,3 +92,35 @@ gsutil mb gs://mycluster
 The above will open an ssh connection to the master node after creating the cluster, forwarding port 8082, so that you can view the cluster status
 in a browser at http://localhost:8082
 
+
+# Tips for paralellization
+
+When writing your Luigi pipelines, it is sometimes necessary to yield tasks form the `run` method. This can limit paralellization if done wrongly.
+To make sure your pipeline works optimally, do not yeild a list of tasks, instead, yield a single task that in turn has those tasks returned by its `require` method:
+
+Replace:
+```
+class MainTask(luigi.Task):
+    def run(self):
+         ....
+         listofnumbers = makeList()
+         yield [SubTask(number) for number in listofnumbers]
+```
+
+With:
+```
+class MiddleTask(luigi.Task):
+    listofnumbers = luigi.Parameter()
+    def run(self):
+        return [SubTask(number) for number in self.listofnumbers]
+    ....
+
+class MainTask(luigi.Task):
+    def run(self):
+         ....
+         listofnumbers = makeList()
+         yield MiddleTask(listofnumbers=listofnumbers)
+```
+
+
+

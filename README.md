@@ -92,6 +92,12 @@ gsutil mb gs://mycluster
 The above will open an ssh connection to the master node after creating the cluster, forwarding port 8082, so that you can view the cluster status
 in a browser at http://localhost:8082
 
+### Docker stack
+
+* Build a docker image using `docker built --tag poltergust:0.0.1`
+* Modify the `docker-compose.yml` to set number of replicas and GCS bucket.
+* Deploy the docker stack using `docker stack deply poltergust -c docker-compose.yml`
+
 
 # Tips for paralellization
 

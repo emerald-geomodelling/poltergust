@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  poltergust:
+#    build: .
+    image: poltergust:0.0.1
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud
+    environment:
+      - PIPELINE_URL=gs://mybucket/pipeline
+      - SCHEDULER_URL=http://scheduler:8082
+      
+  scheduler:
+    image: spotify/luigi
+    ports:
+      - 8082:8082

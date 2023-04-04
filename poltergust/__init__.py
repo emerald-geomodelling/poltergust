@@ -8,9 +8,10 @@ import luigi.format
 import luigi.mock
 import luigi.local_target
 import pieshell
+import math
 import time
 
-def make_environment(envpath, environment):
+def make_environment(envpath, environment, log):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
     if not os.path.exists(envpath):
         envdir = os.path.dirname(envpath)
@@ -19,7 +20,11 @@ def make_environment(envpath, environment):
         +_.virtualenv(envpath, **environment.get("virtualenv", {}))
     +_.bashsource(envpath + "/bin/activate")
     for dep in environment["dependencies"]:
-        +_.pip.install(dep)
+        for line in _.pip.install(dep):
+            log(line)
+
+def iter_to_pcnt(x, a=0.5):
+    return 100 * a * math.log(1 + x) / (1 + a*math.log(1 + x))
 
 class MakeEnvironment(luigi.Task):
     path = luigi.Parameter()
@@ -27,12 +32,27 @@ class MakeEnvironment(luigi.Task):
 
     def run(self):
         with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
-            environment = yaml.load(f, Loader=yaml.SafeLoader)        
-        make_environment(self.output().path, environment)
+            environment = yaml.load(f, Loader=yaml.SafeLoader)
+        self.msgs = []
+        make_environment(self.envdir().path, environment, self.logger)
+        with self.output().open("w") as f:
+            f.write("DONE")        
+
+    def logger(self, msg):
+        self.msgs.append(msg)
+        self.set_status()
+                
+    def set_status(self):
+        self.set_status_message("\n".join(self.msgs))
+        self.set_progress_percentage(iter_to_pcnt(len(self.msgs)))
         
-    def output(self):
+    def envdir(self):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/")))
+    
+    def output(self):
+        return luigi.local_target.LocalTarget(
+            os.path.join("/tmp/environments", self.path.replace("://", "/"), "done"))
         
 class RunTask(luigi.Task):
     path = luigi.Parameter()
@@ -47,6 +67,8 @@ class RunTask(luigi.Task):
         return self.scheduler._url
     
     def run(self):
+        self.msgs = []
+        
         cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
         try:
             with cfg.open("r") as f:
@@ -60,8 +82,9 @@ class RunTask(luigi.Task):
         with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
             environment = yaml.load(f, Loader=yaml.SafeLoader)        
 
-        envpath = yield MakeEnvironment(path=task["environment"], hostname=self.hostname)
-        envpath = envpath.path
+        env = MakeEnvironment(path=task["environment"], hostname=self.hostname)
+        yield env
+        envpath = env.envdir().path
 
         _ = pieshell.env(envpath, interactive=True)
         +_.bashsource(envpath + "/bin/activate")
@@ -82,7 +105,7 @@ class RunTask(luigi.Task):
         task_args["retcode-unhandled-exception"] = "40"
         
         if command is None:
-            command = "+luigi(task_name, **task_args)"
+            command = "luigi(task_name, **task_args)"
 
         scope = pieshell.environ.EnvScope(env=_)
         scope["task_name"] = task_name
@@ -94,9 +117,10 @@ class RunTask(luigi.Task):
         # workers, and our task can't even start...
         while True:
             try:
-                eval(command, scope)
+                for line in eval(command, scope):
+                    self.logger(line)
             except pieshell.PipelineFailed as e:
-                print(e)
+                self.logger(str(e))
                 if e.pipeline.exit_code <= 25:
                     time.sleep(5)
                     continue
@@ -111,6 +135,14 @@ class RunTask(luigi.Task):
         except:
             # Might already have been moved by another node...
             pass
+
+    def logger(self, msg):
+        self.msgs.append(msg)
+        self.set_status()
+                
+    def set_status(self):
+        self.set_status_message("\n".join(self.msgs))
+        self.set_progress_percentage(iter_to_pcnt(len(self.msgs)))
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(

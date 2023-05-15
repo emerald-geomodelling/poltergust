@@ -23,6 +23,30 @@ Poltergust takes care of this for you! You run the poltergust main task on a set
 
 Poltergust currently only supports GCSTargets (and thus gs:// url:s) for its files and so requires Google Cloud Storage. 
 
+## Running
+
+Docker compose file to start poltergust and luigi:
+
+```
+version: "3.9"
+services:
+  poltergust:
+#    build: .
+    image: poltergust:0.0.2
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud
+    environment:
+      - PIPELINE_URL=gs://mybucket/pipeline
+      - SCHEDULER_URL=http://scheduler:8082
+    deploy:
+      replicas: 1 # Set this to how many workers you want
+
+  scheduler:
+    image: spotify/luigi
+    ports:
+      - 8082:8082
+```
+
 ## Files used by the Poltergust task runner
 
 `gs://mybucket/pipeline/mypipeline.config.yaml`:

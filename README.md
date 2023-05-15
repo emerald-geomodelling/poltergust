@@ -32,7 +32,7 @@ version: "3.9"
 services:
   poltergust:
 #    build: .
-    image: poltergust:0.0.2
+    image: redhogorg/poltergust:0.0.2
     volumes:
       - ~/.config/gcloud:/root/.config/gcloud
     environment:

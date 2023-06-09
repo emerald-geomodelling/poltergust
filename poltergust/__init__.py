@@ -137,6 +137,7 @@ class RunTask(luigi.Task):
             pass
 
     def logger(self, msg):
+        print(msg)
         self.msgs.append(msg)
         self.set_status()
                 

@@ -27,7 +27,7 @@ def make_environment(envpath, environment, log):
 def iter_to_pcnt(x, a=0.5):
     return 100 * a * math.log(1 + x) / (1 + a*math.log(1 + x))
 
-class Logging(luigi.Task):
+class Logging(object):
     def on_failure(self, exception):
         traceback_string = traceback.format_exc()
         msg = "Runtime error:\n%s" % traceback_string

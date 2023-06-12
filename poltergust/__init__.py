@@ -48,7 +48,6 @@ class Logging(object):
             self.msgs = []
         print(msg)
         self.msgs.append(msg)
-        self.set_status()                
         self.set_status_message("\n".join(self.msgs))
         self.set_progress_percentage(iter_to_pcnt(len(self.msgs)))
 

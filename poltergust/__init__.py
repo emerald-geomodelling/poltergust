@@ -31,14 +31,19 @@ class MakeEnvironment(luigi.Task):
     hostname = luigi.Parameter()
 
     def run(self):
-        with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
-            environment = yaml.load(f, Loader=yaml.SafeLoader)
         self.msgs = []
-        make_environment(self.envdir().path, environment, self.logger)
+        try:
+            with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
+                environment = yaml.load(f, Loader=yaml.SafeLoader)
+            make_environment(self.envdir().path, environment, self.logger)
+        finally:
+            with self.log().open("w") as f:
+                f.write("\n".join(self.msgs))
         with self.output().open("w") as f:
             f.write("DONE")        
 
     def logger(self, msg):
+        print(msg)
         self.msgs.append(msg)
         self.set_status()
                 
@@ -50,6 +55,9 @@ class MakeEnvironment(luigi.Task):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/")))
     
+    def log(self):
+        return luigi.contrib.gcs.GCSTarget("%s.%s.log.txt" % (self.path, self.hostname))
+            
     def output(self):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/"), "done"))
@@ -68,65 +76,68 @@ class RunTask(luigi.Task):
     
     def run(self):
         self.msgs = []
-        
-        cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
         try:
-            with cfg.open("r") as f:
-                task = yaml.load(f, Loader=yaml.SafeLoader)
-        except:
-            if not cfg.fs.exists(cfg.path):
-                # The task has already been marked as done by another worker.
-                return
-            raise
-                
-        with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
-            environment = yaml.load(f, Loader=yaml.SafeLoader)        
-
-        env = MakeEnvironment(path=task["environment"], hostname=self.hostname)
-        yield env
-        envpath = env.envdir().path
-
-        _ = pieshell.env(envpath, interactive=True)
-        +_.bashsource(envpath + "/bin/activate")
-
-        _._exports.update(environment.get("variables", {}))
-        _._exports.update(task.get("variables", {}))
-        
-        command = task.get("command", None)
-
-        task_args = dict(task.get("task", {}))
-        task_name = task_args.pop("name", None)
-        task_args["scheduler-url"] = self.scheduler_url
-        task_args["retcode-already-running"] = "10"
-        task_args["retcode-missing-data"] = "20"
-        task_args["retcode-not-run"] = "25"
-        task_args["retcode-task-failed"] = "30"
-        task_args["retcode-scheduling-error"] = "35"
-        task_args["retcode-unhandled-exception"] = "40"
-        
-        if command is None:
-            command = "luigi(task_name, **task_args)"
-
-        scope = pieshell.environ.EnvScope(env=_)
-        scope["task_name"] = task_name
-        scope["task_args"] = task_args
-
-        # Rerun the task until it is actually being run (or is done!)
-        # We need to do this, since luigi might exit because all
-        # dependencies of a task are already being run by other
-        # workers, and our task can't even start...
-        while True:
+            cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
             try:
-                for line in eval(command, scope):
-                    self.logger(line)
-            except pieshell.PipelineFailed as e:
-                self.logger(str(e))
-                if e.pipeline.exit_code <= 25:
-                    time.sleep(5)
-                    continue
+                with cfg.open("r") as f:
+                    task = yaml.load(f, Loader=yaml.SafeLoader)
+            except:
+                if not cfg.fs.exists(cfg.path):
+                    # The task has already been marked as done by another worker.
+                    return
                 raise
-            break
-            
+
+            with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
+                environment = yaml.load(f, Loader=yaml.SafeLoader)        
+
+            env = MakeEnvironment(path=task["environment"], hostname=self.hostname)
+            yield env
+            envpath = env.envdir().path
+
+            _ = pieshell.env(envpath, interactive=True)
+            +_.bashsource(envpath + "/bin/activate")
+
+            _._exports.update(environment.get("variables", {}))
+            _._exports.update(task.get("variables", {}))
+
+            command = task.get("command", None)
+
+            task_args = dict(task.get("task", {}))
+            task_name = task_args.pop("name", None)
+            task_args["scheduler-url"] = self.scheduler_url
+            task_args["retcode-already-running"] = "10"
+            task_args["retcode-missing-data"] = "20"
+            task_args["retcode-not-run"] = "25"
+            task_args["retcode-task-failed"] = "30"
+            task_args["retcode-scheduling-error"] = "35"
+            task_args["retcode-unhandled-exception"] = "40"
+
+            if command is None:
+                command = "luigi(task_name, **task_args)"
+
+            scope = pieshell.environ.EnvScope(env=_)
+            scope["task_name"] = task_name
+            scope["task_args"] = task_args
+
+            # Rerun the task until it is actually being run (or is done!)
+            # We need to do this, since luigi might exit because all
+            # dependencies of a task are already being run by other
+            # workers, and our task can't even start...
+            while True:
+                try:
+                    for line in eval(command, scope):
+                        self.logger(line)
+                except pieshell.PipelineFailed as e:
+                    self.logger(str(e))
+                    if e.pipeline.exit_code <= 25:
+                        time.sleep(5)
+                        continue
+                    raise
+                break
+        finally:
+            with self.log().open("w") as f:
+                f.write("\n".join(self.msgs))
+                
         fs = self.output().fs
         src = '%s.config.yaml' % (self.path,)
         dst = '%s.done.yaml' % (self.path,)
@@ -144,6 +155,9 @@ class RunTask(luigi.Task):
     def set_status(self):
         self.set_status_message("\n".join(self.msgs))
         self.set_progress_percentage(iter_to_pcnt(len(self.msgs)))
+
+    def log(self):
+        return luigi.contrib.gcs.GCSTarget("%s.%s.log.txt" % (self.path, self.hostname))
 
     def output(self):
          return luigi.contrib.gcs.GCSTarget(

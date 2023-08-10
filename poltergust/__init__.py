@@ -150,9 +150,6 @@ class RunTask(Logging, luigi.Task):
                     raise
                 break
 
-        fs = self.output().fs
-        src = '%s.config.yaml' % (self.path,)
-
         except Exception as e:
             self.on_failure(e)
             if self.retry_on_error:
@@ -162,6 +159,8 @@ class RunTask(Logging, luigi.Task):
             self.on_success()            
             dst = '%s.done.yaml' % (self.path,)
             
+        src = '%s.config.yaml' % (self.path,)
+        fs = self.output().fs
         try:
             fs.move(src, dst)
         except:

@@ -31,31 +31,34 @@ class Logging(object):
     def on_failure(self, exception):
         traceback_string = traceback.format_exc()
         msg = "Runtime error:\n%s" % traceback_string
-        self.log(msg)
+        self._log(msg)
         self.close_log()
         return msg
         
     def on_success(self):
-        self.log("DONE")
+        self._log("DONE")
         self.close_log()
         
     def close_log(self):
         with self.logfile().open("w") as f:
-            f.write("\n".join(self.msgs))
+            f.write("\n".join(self.msgs) + "\n")
     
-    def log(self, msg):
+    def _log(self, msg):
         if not hasattr(self, "msgs"):
             self.msgs = []
         print(msg)
         self.msgs.append(msg)
+
+    def log(self, msg):
+        self._log(msg)
         self.set_status_message("\n".join(self.msgs))
         self.set_progress_percentage(iter_to_pcnt(len(self.msgs)))
 
         
-class MakeEnvironment(luigi.Task, Logging):
+class MakeEnvironment(Logging, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
-
+        
     def run(self):
         with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
             environment = yaml.load(f, Loader=yaml.SafeLoader)
@@ -74,7 +77,7 @@ class MakeEnvironment(luigi.Task, Logging):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/"), "done"))
         
-class RunTask(luigi.Task, Logging):
+class RunTask(Logging, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
     retry_on_error = luigi.Parameter(default=False)

@@ -11,6 +11,9 @@ import pieshell
 import traceback
 import math
 import time
+import requests
+
+DB_URL = os.environ.get("DB_URL")
 
 def make_environment(envpath, environment, log):
     _ = pieshell.env(exports=dict(pieshell.env._exports))
@@ -91,6 +94,9 @@ class RunTask(Logging, luigi.Task):
         return self.scheduler._url
     
     def run(self):
+        src = '%s.config.yaml' % (self.path,)
+        fs = self.output().fs
+        
         try:
             cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
             try:
@@ -155,17 +161,24 @@ class RunTask(Logging, luigi.Task):
             if self.retry_on_error:
                 raise
             dst = '%s.error.yaml' % (self.path,)
+            try:
+                fs.move(src, dst)
+            except:
+                # Might already have been moved by another node...
+                pass
         else:
-            self.on_success()            
+            self.on_success()
             dst = '%s.done.yaml' % (self.path,)
-            
-        src = '%s.config.yaml' % (self.path,)
-        fs = self.output().fs
-        try:
-            fs.move(src, dst)
-        except:
-            # Might already have been moved by another node...
-            pass
+            try:
+                fs.move(src, dst)
+            except:
+                # Might already have been moved by another node...
+                pass
+
+        if DB_URL is not None:
+            r = requests.get(DB_URL, params={"pipeline_url": self.path})
+            if r.status_code != 200:
+                print("Unable to update status", r.status_code, r.text)
         
     def logfile(self):
         return luigi.contrib.gcs.GCSTarget("%s.%s.log.txt" % (self.path, self.hostname))

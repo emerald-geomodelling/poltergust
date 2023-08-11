@@ -3,15 +3,13 @@ import yaml
 import sys
 import traceback
 import luigi
-import luigi.contrib.gcs
-import luigi.format
-import luigi.mock
 import luigi.local_target
 import pieshell
 import traceback
 import math
 import time
 import requests
+import poltergust_luigi_utils # Add GCS luigi opener
 
 DB_URL = os.environ.get("DB_URL")
 
@@ -63,7 +61,7 @@ class MakeEnvironment(Logging, luigi.Task):
     hostname = luigi.Parameter()
         
     def run(self):
-        with luigi.contrib.gcs.GCSTarget(self.path).open("r") as f:
+        with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
             environment = yaml.load(f, Loader=yaml.SafeLoader)
         make_environment(self.envdir().path, environment, self.log)
         with self.output().open("w") as f:
@@ -71,14 +69,14 @@ class MakeEnvironment(Logging, luigi.Task):
         
     def envdir(self):
         return luigi.local_target.LocalTarget(
-            os.path.join("/tmp/environments", self.path.replace("://", "/")))
+            os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/")))
     
     def logfile(self):
-        return luigi.contrib.gcs.GCSTarget("%s.%s.log.txt" % (self.path, self.hostname))
+        return luigi.contrib.opener.OpenerTarget("%s.%s.log.txt" % (self.path, self.hostname))
             
     def output(self):
         return luigi.local_target.LocalTarget(
-            os.path.join("/tmp/environments", self.path.replace("://", "/"), "done"))
+            os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/"), "done"))
         
 class RunTask(Logging, luigi.Task):
     path = luigi.Parameter()
@@ -98,7 +96,7 @@ class RunTask(Logging, luigi.Task):
         fs = self.output().fs
         
         try:
-            cfg = luigi.contrib.gcs.GCSTarget('%s.config.yaml' % (self.path,))
+            cfg = luigi.contrib.opener.OpenerTarget('%s.config.yaml' % (self.path,))
             try:
                 with cfg.open("r") as f:
                     task = yaml.load(f, Loader=yaml.SafeLoader)
@@ -108,7 +106,7 @@ class RunTask(Logging, luigi.Task):
                     return
                 raise
 
-            with luigi.contrib.gcs.GCSTarget(task["environment"]).open("r") as f:
+            with luigi.contrib.opener.OpenerTarget(task["environment"]).open("r") as f:
                 environment = yaml.load(f, Loader=yaml.SafeLoader)        
 
             env = MakeEnvironment(path=task["environment"], hostname=self.hostname)
@@ -181,10 +179,10 @@ class RunTask(Logging, luigi.Task):
                 print("Unable to update status", r.status_code, r.text)
         
     def logfile(self):
-        return luigi.contrib.gcs.GCSTarget("%s.%s.log.txt" % (self.path, self.hostname))
+        return luigi.contrib.opener.OpenerTarget("%s.%s.log.txt" % (self.path, self.hostname))
 
     def output(self):
-         return luigi.contrib.gcs.GCSTarget(
+         return luigi.contrib.opener.OpenerTarget(
              '%s.done.yaml' % (self.path,))
 
         
@@ -201,7 +199,7 @@ class RunTasks(luigi.Task):
     
     def output(self):
         # This target should never actually be created...
-        return luigi.contrib.gcs.GCSTarget('%s/done' % (self.path,))
+        return luigi.contrib.opener.OpenerTarget('%s/done' % (self.path,))
     
 
 # luigi --module emerald_algorithms_evaluation.luigi Pipeline --param-evaluation_name=test-luigi-redhog-1

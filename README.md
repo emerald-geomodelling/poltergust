@@ -21,7 +21,8 @@ Poltergust takes care of this for you! You run the poltergust main task on a set
 
 ## Limitations and requirements
 
-Poltergust currently only supports GCSTargets (and thus gs:// url:s) for its files and so requires Google Cloud Storage. 
+Poltergust supports all target types supported by
+luigi.contrib.opener, plus Google Cloud Storage targets (gs:// urls) for file storage.
 
 ## Running
 
@@ -90,8 +91,9 @@ key `variables`.
 
 When a task is done `gs://mybucket/pipeline/mypipeline.config.yaml` is
 renamed to `gs://mybucket/pipeline/mypipeline.done.yaml` (since a task
-is run on multiple nodes: the first one to mark the task as done renames
-the file).
+is run on multiple nodes: the first one to mark the task as done
+renames the file). If the task fails, the config file is instead
+renamed to `gs://mybucket/pipeline/mypipeline.error.yaml`
 
 ## Instantiating the task runner manually on a single machine
 

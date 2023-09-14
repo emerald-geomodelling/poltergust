@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  poltergust:
+    image: "${GOOGLE_ARTIFACTS_REG}/poltergust:${DOCKER_TAG}"
+    hostname: poltergust
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+    environment:
+      - PIPELINE_URL=$PIPELINE_URL
+      - SCHEDULER_URL=$SCHEDULER_URL
+      - CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=/run/secrets/poltergust-key
+      - CLOUDSDK_CORE_PROJECT=$GOOGLE_CLOUD_PROJECT
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/poltergust-key
+    secrets:
+      - poltergust-key
+
+  scheduler:
+    image: spotify/luigi
+    hostname: scheduler
+    ports:
+      - 8082:8082
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+secrets:
+  poltergust-key:
+    external: true

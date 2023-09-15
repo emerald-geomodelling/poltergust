@@ -8,6 +8,7 @@ services:
       placement:
         constraints:
           - node.role == worker
+          - node.labels.mig-node=yes
     environment:
       - PIPELINE_URL=$PIPELINE_URL
       - SCHEDULER_URL=$SCHEDULER_URL

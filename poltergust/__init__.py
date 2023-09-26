@@ -83,7 +83,7 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
                         # The task has already been marked as done by another worker.
                         return
                     raise
-                self.log('RunTask config loaded'))
+                self.log('RunTask config loaded')
 
                 with luigi.contrib.opener.OpenerTarget(task["environment"]).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader)        

@@ -11,6 +11,7 @@ import time
 import requests
 import datetime
 import poltergust_luigi_utils # Add GCS luigi opener
+import poltergust_luigi_utils.logging_task
 
 DB_URL = os.environ.get("DB_URL")
 
@@ -29,7 +30,7 @@ def make_environment(envpath, environment, log):
         for line in _.pip.install(dep):
             log(line)
         
-class MakeEnvironment(poltergust_luigi_utils.LoggingTask, luigi.Task):
+class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
     retry_on_error = luigi.Parameter(default=False)
@@ -53,7 +54,7 @@ class MakeEnvironment(poltergust_luigi_utils.LoggingTask, luigi.Task):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/"), "done"))
         
-class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
+class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
     retry_on_error = luigi.Parameter(default=False)
@@ -67,8 +68,8 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
         return self.scheduler._url
     
     def run(self):
-        self.log('%s: %s (%s) RunTask start' % (strnow(), self.path, self.hostname))
         with self.logging(self.retry_on_error):
+            self.log('RunTask start')
 
             src = '%s.config.yaml' % (self.path,)
             fs = self.output().fs
@@ -136,6 +137,7 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
                         raise
                     break
 
+                self.log('RunTask end')
                 dst = '%s.done.yaml' % (self.path,)
 
             except Exception as e:
@@ -148,7 +150,6 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
         except:
             # Might already have been moved by another node...
             pass
-        self.log('RunTask end')
 
         if DB_URL is not None:
             r = requests.get(DB_URL, params={"pipeline_url": self.path})

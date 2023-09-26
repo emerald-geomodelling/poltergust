@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN echo Version 2
+RUN echo Version 3
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update

@@ -93,7 +93,7 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
                 if not env.output().exists():
                     yield env
                 envpath = env.envdir().path
-                self.log('RunTask environment made ' + strnow())
+                self.log('RunTask environment made')
 
                 _ = pieshell.env(envpath, interactive=True)
                 +_.bashsource(envpath + "/bin/activate")
@@ -101,7 +101,7 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
                 _._exports.update(environment.get("variables", {}))
                 _._exports.update(task.get("variables", {}))
 
-                self.log('RunTask loaded environment ' + strnow())
+                self.log('RunTask loaded environment')
 
                 command = task.get("command", None)
 
@@ -171,12 +171,11 @@ class RunTasks(luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
 
-    def requires(self):
-        return [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
-                for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
-
     def run(self):
-        pass
+        while True:
+            yield [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
+                   for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
+            time.sleep(1)
     
     def output(self):
         # This target should never actually be created...

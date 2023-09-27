@@ -89,15 +89,18 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
                     environment = yaml.load(f, Loader=yaml.SafeLoader)        
 
                 env = MakeEnvironment(path=task["environment"], hostname=self.hostname, retry_on_error=self.retry_on_error)
-                yield env
+                if not env.output().exists():
+                    yield env
                 envpath = env.envdir().path
-                self.log('RunTask environment made')
+                self.log('RunTask environment made ' + strnow())
 
                 _ = pieshell.env(envpath, interactive=True)
                 +_.bashsource(envpath + "/bin/activate")
 
                 _._exports.update(environment.get("variables", {}))
                 _._exports.update(task.get("variables", {}))
+
+                self.log('RunTask loaded environment ' + strnow())
 
                 command = task.get("command", None)
 
@@ -118,7 +121,7 @@ class RunTask(poltergust_luigi_utils.LoggingTask, luigi.Task):
                 scope["task_name"] = task_name
                 scope["task_args"] = task_args
 
-                self.log('RunTask starting actual task')
+                self.log('RunTask starting actual task' + strnow())
 
                 # Rerun the task until it is actually being run (or is done!)
                 # We need to do this, since luigi might exit because all

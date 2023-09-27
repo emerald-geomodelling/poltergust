@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='luigi-poltergust',
-    version='0.0.3',
+    version='0.0.4',
     description='Task trigger for Luigi',
     long_description='''Trigger Luigi tasks on multiple worker
 machines. Python modules for tasks and their dependencies are

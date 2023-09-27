@@ -23,6 +23,6 @@ installed automatically in virtualenvs on each worker.
         "requests",
         "google-auth",
         "google-api-python-client",
-        "poltergust-luigi-utils>=0.0.7"
+        "poltergust-luigi-utils>=0.0.8"
     ],
 )

@@ -24,6 +24,6 @@ ADD . /app
 
 WORKDIR /app
 
-RUN pip install .
+RUN pip install -e .
 
 CMD ["/app/main.sh"]

@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='luigi-poltergust',
-    version='0.0.2',
+    version='0.0.4',
     description='Task trigger for Luigi',
     long_description='''Trigger Luigi tasks on multiple worker
 machines. Python modules for tasks and their dependencies are
@@ -17,12 +17,12 @@ installed automatically in virtualenvs on each worker.
     packages=setuptools.find_packages(),
     install_requires=[
         "luigi",
-        "pieshell",
+        "pieshell[ps,linux] >= 0.2.11",
         "pyyaml",
         "virtualenv",
         "requests",
         "google-auth",
         "google-api-python-client",
-        "poltergust-luigi-utils>=0.0.4"
+        "poltergust-luigi-utils>=0.0.8"
     ],
 )

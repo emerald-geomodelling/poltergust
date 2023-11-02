@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN echo Version 2
+RUN echo Version 3
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
@@ -17,7 +17,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.c
 # Not needed by poltergust, but by many things we might want to run using poltergust
 
 # commented out bc of M2 issues
-RUN apt install -y libmkl-dev 
+#RUN apt install -y libmkl-dev 
 RUN apt install -y libgdal-dev
 
 ADD . /app

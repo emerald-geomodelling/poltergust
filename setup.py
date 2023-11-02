@@ -17,7 +17,7 @@ installed automatically in virtualenvs on each worker.
     packages=setuptools.find_packages(),
     install_requires=[
         "luigi",
-        "pieshell",
+        "pieshell[ps,linux] >= 0.2.11",
         "pyyaml",
         "virtualenv",
         "requests",

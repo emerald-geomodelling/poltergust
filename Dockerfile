@@ -16,8 +16,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.c
 
 # Not needed by poltergust, but by many things we might want to run using poltergust
 
-# commented out bc of M2 issues
-#RUN apt install -y libmkl-dev 
+RUN apt install -y libmkl-dev 
 RUN apt install -y libgdal-dev
 
 ADD . /app

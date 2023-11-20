@@ -1,7 +1,10 @@
 import os.path
+import os
 import yaml
 import sys
 import traceback
+import zipfile
+from pathlib import Path
 import luigi
 import luigi.local_target
 import pieshell
@@ -12,6 +15,7 @@ import requests
 import datetime
 import poltergust_luigi_utils # Add GCS luigi opener
 import poltergust_luigi_utils.logging_task
+import poltergust_luigi_utils.gcs_opener
 
 DB_URL = os.environ.get("DB_URL")
 
@@ -29,7 +33,39 @@ def make_environment(envpath, environment, log):
     for dep in environment["dependencies"]:
         for line in _.pip.install(dep):
             log(line)
-        
+
+def zip_dir(envdir, envpath):
+    # Use absolute paths
+    path = Path(envdir).expanduser().resolve()
+    dirlist = [d for d in path.glob(envpath) if d.is_dir()]
+
+    # Compression using ZIP_DEFLATED level 6 for speed
+    for dir in dirlist:
+        zip_env = dir.with_suffix(".zip")
+        with zipfile.ZipFile(zip_env, mode="w",
+                             compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+            for root, _, files in os.walk(dir):
+                for file in files:
+                    fn = Path(root, file)
+                    afn = fn.relative_to(path)
+                    z.write(fn, arcname=afn)
+        print("WRITE", zip_env)
+
+
+def download_environment(envpath, path, log):
+    print("Downloading gcs env")
+    if not os.path.exists(envpath):
+        envdir = os.path.dirname(envpath)
+        if not os.path.exists(envdir):
+            os.makedirs(envdir)
+
+        with poltergust_luigi_utils.client.download(path) as z:
+            with zipfile.ZipFile(z) as env_zip:
+                log(env_zip.printdir())
+                env_zip.extractall(path=envpath)
+        print("done gcs download")
+
+
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
@@ -37,12 +73,18 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
 
     def run(self):
         with self.logging(self.retry_on_error):
-            with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
-                environment = yaml.load(f, Loader=yaml.SafeLoader)
-            make_environment(self.envdir().path, environment, self.log)
-            with self.output().open("w") as f:
-                f.write("DONE")        
-        
+            path = self.path.rsplit('.', 1)[0] + ".zip"
+            if poltergust_luigi_utils.gcs_opener.client.exists(path):
+                download_environment(self.envdir().path, path, self.log)
+            else:
+                with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
+                    environment = yaml.load(f, Loader=yaml.SafeLoader)
+                    make_environment(self.envdir().path, environment, self.log)
+                    with self.output().open("w") as f:
+                        f.write("DONE")        
+                    zip_dir(self.envdir().path, self.path)
+                    # poltergust_lgi_utils.gcs_opener.client.put()
+
     def envdir(self):
         return luigi.local_target.LocalTarget(
             os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/")))

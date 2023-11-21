@@ -49,11 +49,9 @@ def zip_dir(envdir, envpath):
                     fn = Path(root, file)
                     afn = fn.relative_to(path)
                     z.write(fn, arcname=afn)
-        print("WRITE", zip_env)
 
 
 def download_environment(envpath, path, log):
-    print("Downloading gcs env")
     if not os.path.exists(envpath):
         envdir = os.path.dirname(envpath)
         if not os.path.exists(envdir):
@@ -63,7 +61,6 @@ def download_environment(envpath, path, log):
             with zipfile.ZipFile(z) as env_zip:
                 log(env_zip.printdir())
                 env_zip.extractall(path=envpath)
-        print("done gcs download")
 
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):

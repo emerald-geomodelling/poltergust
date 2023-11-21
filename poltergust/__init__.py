@@ -34,7 +34,7 @@ def make_environment(envpath, environment, log):
         for line in _.pip.install(dep):
             log(line)
 
-def zip_dir(envdir, envpath):
+def zip_dir(envdir, envpath, log):
     # Use absolute paths
     path = Path(envdir).expanduser().resolve()
     dirlist = [d for d in path.glob(envpath) if d.is_dir()]
@@ -42,6 +42,7 @@ def zip_dir(envdir, envpath):
     # Compression using ZIP_DEFLATED level 6 for speed
     for dir in dirlist:
         zip_env = dir.with_suffix(".zip")
+        log(f'Zip archive: {zip_env}')
         with zipfile.ZipFile(zip_env, mode="w",
                              compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
             for root, _, files in os.walk(dir):
@@ -57,10 +58,10 @@ def download_environment(envpath, path, log):
         if not os.path.exists(envdir):
             os.makedirs(envdir)
 
-        with poltergust_luigi_utils.client.download(path) as z:
-            with zipfile.ZipFile(z) as env_zip:
-                log(env_zip.printdir())
-                env_zip.extractall(path=envpath)
+    with poltergust_luigi_utils.client.download(path) as z:
+        with zipfile.ZipFile(z) as env_zip:
+            env_zip.extractall(path=envpath)
+            log(env_zip.printdir())
 
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
@@ -79,8 +80,7 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                    zip_dir(self.envdir().path, self.path)
-                    # poltergust_lgi_utils.gcs_opener.client.put()
+                zip_dir(self.envdir().path, self.path, self.log)
 
     def envdir(self):
         return luigi.local_target.LocalTarget(

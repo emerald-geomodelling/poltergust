@@ -64,7 +64,8 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
     def run(self):
         with self.logging(self.retry_on_error):
             zip_path = str(self.path) + ".zip"
-            if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
+            # if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
+            if luigi.contrib.opener.OpenerTarget(zip_path).exists():
                 download_environment(self.envdir().path, zip_path, self.log)
             else:
                 with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:

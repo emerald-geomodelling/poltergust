@@ -51,7 +51,7 @@ def download_environment(envpath, path, log):
             os.makedirs(envdir)
 
     with poltergust_luigi_utils.client.download(path) as z:
-        with zipfile.ZipFile(path, mode="r") as arc:
+        with zipfile.ZipFile(z, mode="r") as arc:
             arc.extractall(envpath)
         log(arc.printdir())
 
@@ -64,9 +64,8 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
     def run(self):
         with self.logging(self.retry_on_error):
             zip_path = str(self.path) + ".zip"
-            print(zip_path)
             if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
-                download_environment(self.envdir().path, self.path, self.log)
+                download_environment(self.envdir().path, zip_path, self.log)
             else:
                 with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader)

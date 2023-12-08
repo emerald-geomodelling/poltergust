@@ -95,7 +95,7 @@ is run on multiple nodes: the first one to mark the task as done
 renames the file). If the task fails, the config file is instead
 renamed to `gs://mybucket/pipeline/mypipeline.error.yaml`
 
-## Task noification
+## Task notification
 
 ```
 services:

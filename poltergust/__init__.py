@@ -45,7 +45,7 @@ def zip_dir(envdir, log):
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
         for file in envdir.rglob('*'):
             f.write(file, arcname=file.relative_to(envdir))
-            log("Zipped: {}".format(file))
+    log("Zipped: {}".format(archive))
     return archive
 
 

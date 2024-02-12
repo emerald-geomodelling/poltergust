@@ -34,7 +34,7 @@ def make_environment(envpath, environment, log):
     +_.bashsource(envpath + "/bin/activate")
     for dep in environment["dependencies"]:
         if TAG in dep:
-            dep = re.sub(TAG, _._exports["GITHUB_TOKEN"], dep)
+            dep = re.sub(TAG, _._exports["GITHUB_TOKEN_EMRLD"], dep)
         for line in _.pip.install(dep):
             log(line)
 

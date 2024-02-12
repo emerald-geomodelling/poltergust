@@ -19,7 +19,7 @@ import poltergust_luigi_utils.logging_task
 import poltergust_luigi_utils.gcs_opener
 
 DB_URL = os.environ.get("DB_URL")
-TAG = r"{{GITHUB_TOKEN}}"
+TAG = r"{{POLTERGUST_PIP}}"
 
 def strnow():
     return datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f")

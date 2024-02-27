@@ -40,6 +40,15 @@ def make_environment(envpath, environment, log):
 
 
 def zip_dir(envdir, log):
+    """ Zip directories containing Python virtual environments
+
+    Args:
+        envdir: Path to the environment directory
+        log: Luigi logger
+
+    Returns:
+        The zip file containing the compressed virtual env
+    """
     archive = envdir + ".zip"
     envdir = Path(envdir)
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
@@ -50,6 +59,17 @@ def zip_dir(envdir, log):
 
 
 def download_environment(envpath, path, log):
+    """ Download and extract the zipped virtual environment from GCS
+
+    Args:
+        envpath: GCS URL to the zip file e.g. gs://a/b/c
+        path: The local path to extract the environment
+        log: Luigi logger
+
+    Returns:
+        A directory on the 'path' with the contents of the python
+        virtual environment
+    """
     if not os.path.exists(envpath):
         envdir = os.path.dirname(envpath)
         if not os.path.exists(envdir):
@@ -62,26 +82,37 @@ def download_environment(envpath, path, log):
 
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
+    """ Luigi task for Python virtual environments
+
+    Luigi Parameters:
+        path: path to the GCS URL for storing environment configs
+        hostname: hostname of the worker machine
+        retry_on_error: retry_on_error (Bool)
+    """
     path = luigi.Parameter()
     hostname = luigi.Parameter()
     retry_on_error = luigi.Parameter(default=False)
 
     def run(self):
         with self.logging(self.retry_on_error):
-            zip_path = str(self.path) + ".zip"
+            """ Checks first if the environment already exists as a .zip file
+            on GCS and downloads it if true. Otherwise create a new one, zip
+            it, and upload to GCS for use by other workers
+
+            """
+            # zip_path = str(self.path) + ".zip"
             # if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
-            if luigi.contrib.opener.OpenerTarget(zip_path).exists():
-                download_environment(self.envdir().path, zip_path, self.log)
-            else:
-                with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
-                    environment = yaml.load(f, Loader=yaml.SafeLoader)
-                    #environment = parse_config(f)
-                    print(environment)
-                    make_environment(self.envdir().path, environment, self.log)
-                    with self.output().open("w") as f:
-                        f.write("DONE")        
-                archived_env = zip_dir(self.envdir().path, self.log)
-                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
+            #if luigi.contrib.opener.OpenerTarget(zip_path).exists():
+            #    download_environment(self.envdir().path, zip_path, self.log)
+            #else:
+            with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
+                environment = yaml.load(f, Loader=yaml.SafeLoader)
+                print(environment)
+                make_environment(self.envdir().path, environment, self.log)
+                with self.output().open("w") as f:
+                    f.write("DONE")        
+                # archived_env = zip_dir(self.envdir().path, self.log)
+                # poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
 
 
     def envdir(self):
@@ -207,15 +238,26 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
          return luigi.contrib.opener.OpenerTarget(
              '%s.done.yaml' % (self.path,))
 
-        
+
+class MiddleTask(luigi.WrapperTask):
+    path = luigi.Parameter()
+    hostname = luigi.Parameter()
+
+    def requires(self):
+        yield RunTask(path=self.path, hostname=self.hostname) 
+
+    # def output(self):
+        # return luigi.contrib.opener.OpenerTarget('%s/done' % (self.path,))
+    
+
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
 
     def run(self):
         while True:
-            yield [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
-                   for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
+            for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,)):
+                yield MiddleTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
             time.sleep(1)
     
     def output(self):

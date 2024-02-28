@@ -39,28 +39,6 @@ def make_environment(envpath, environment, log):
             log(line)
 
 
-def zip_dir(envdir, log):
-    archive = envdir + ".zip"
-    envdir = Path(envdir)
-    with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
-        for file in envdir.rglob('*'):
-            f.write(file, arcname=file.relative_to(envdir))
-    log("Zipped: {}".format(archive))
-    return archive
-
-
-def download_environment(envpath, path, log):
-    if not os.path.exists(envpath):
-        envdir = os.path.dirname(envpath)
-        if not os.path.exists(envdir):
-            os.makedirs(envdir)
-
-    with poltergust_luigi_utils.client.download(path) as z:
-        with zipfile.ZipFile(z, mode="r") as arc:
-            arc.extractall(envpath)
-        log(arc.printdir())
-
-
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
@@ -68,21 +46,11 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
 
     def run(self):
         with self.logging(self.retry_on_error):
-            zip_path = str(self.path) + ".zip"
-            # if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
-            if luigi.contrib.opener.OpenerTarget(zip_path).exists():
-                download_environment(self.envdir().path, zip_path, self.log)
-            else:
-                with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
-                    environment = yaml.load(f, Loader=yaml.SafeLoader)
-                    #environment = parse_config(f)
-                    print(environment)
-                    make_environment(self.envdir().path, environment, self.log)
-                    with self.output().open("w") as f:
-                        f.write("DONE")        
-                archived_env = zip_dir(self.envdir().path, self.log)
-                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
-
+            with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
+                environment = yaml.load(f, Loader=yaml.SafeLoader)
+                make_environment(self.envdir().path, environment, self.log)
+                with self.output().open("w") as f:
+                    f.write("DONE")        
 
     def envdir(self):
         return luigi.local_target.LocalTarget(
@@ -129,6 +97,7 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
 
                 with luigi.contrib.opener.OpenerTarget(task["environment"]).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader) 
+                    self.log(environment)
 
                 env = MakeEnvironment(path=task["environment"], hostname=self.hostname, retry_on_error=self.retry_on_error)
                 if not env.output().exists():

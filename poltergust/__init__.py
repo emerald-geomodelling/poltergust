@@ -16,6 +16,7 @@ import datetime
 import poltergust_luigi_utils # Add GCS luigi opener
 import poltergust_luigi_utils.logging_task
 import poltergust_luigi_utils.gcs_opener
+import fnmatch
 
 DB_URL = os.environ.get("DB_URL")
 
@@ -200,6 +201,12 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
          return luigi.contrib.opener.OpenerTarget(
              '%s.done.yaml' % (self.path,))
 
+def list_wildcard(fs, path):
+    if hasattr(fs, "list_wildcard"):
+        return fs.list_wildcard(path)
+    else:
+        dirpath, pattern = path.rsplit("/", 1)
+        return fnmatch.filter(fs.listdir(dirpath), path) 
         
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
@@ -208,7 +215,7 @@ class RunTasks(luigi.Task):
     def run(self):
         while True:
             yield [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
-                   for path in self.output().fs.list_wildcard('%s/*.config.yaml' % (self.path,))]
+                   for path in list_wildcard(self.output().fs, '%s/*.config.yaml' % (self.path,))]
             time.sleep(1)
     
     def output(self):
@@ -217,3 +224,15 @@ class RunTasks(luigi.Task):
     
 
 # luigi --module emerald_algorithms_evaluation.luigi Pipeline --param-evaluation_name=test-luigi-redhog-1
+
+class TestTask(luigi.Task):
+    name = luigi.Parameter()
+    time = luigi.Parameter()
+    
+    def run(self):
+        time.sleep(int(self.time))
+        with self.output().open("w") as f:
+            f.write("DONE")        
+
+    def output(self):
+        return luigi.contrib.opener.OpenerTarget(self.name)

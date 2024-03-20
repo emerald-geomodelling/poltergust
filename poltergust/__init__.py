@@ -1,4 +1,5 @@
 import os
+import re
 import os.path
 import yaml
 from pathlib import Path
@@ -19,6 +20,7 @@ import poltergust_luigi_utils.gcs_opener
 import fnmatch
 
 DB_URL = os.environ.get("DB_URL")
+TAG = r"{{POLTERGUST_PIP}}"
 
 def strnow():
     return datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f")
@@ -32,8 +34,11 @@ def make_environment(envpath, environment, log):
         +_.virtualenv(envpath, **environment.get("virtualenv", {}))
     +_.bashsource(envpath + "/bin/activate")
     for dep in environment["dependencies"]:
+        if TAG in dep:
+            dep = re.sub(TAG, _._exports["GITHUB_TOKEN_EMRLD"], dep)
         for line in _.pip.install(dep):
             log(line)
+
 
 def zip_dir(envdir, log):
     archive = envdir + ".zip"
@@ -41,7 +46,7 @@ def zip_dir(envdir, log):
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
         for file in envdir.rglob('*'):
             f.write(file, arcname=file.relative_to(envdir))
-        log("Zipped: {}".format(f))
+    log("Zipped: {}".format(archive))
     return archive
 
 
@@ -71,6 +76,8 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
             else:
                 with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader)
+                    #environment = parse_config(f)
+                    print(environment)
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
@@ -122,7 +129,7 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
                 self.log('RunTask config loaded')
 
                 with luigi.contrib.opener.OpenerTarget(task["environment"]).open("r") as f:
-                    environment = yaml.load(f, Loader=yaml.SafeLoader)        
+                    environment = yaml.load(f, Loader=yaml.SafeLoader) 
 
                 env = MakeEnvironment(path=task["environment"], hostname=self.hostname, retry_on_error=self.retry_on_error)
                 if not env.output().exists():

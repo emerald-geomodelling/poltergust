@@ -187,6 +187,8 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
 
             except Exception as e:
                 dst = '%s.error.yaml' % (self.path,)
+                self.log("Task failed: %s" % e)
+                self.log(traceback.format_exc())
             
         src = '%s.config.yaml' % (self.path,)
         fs = self.output().fs

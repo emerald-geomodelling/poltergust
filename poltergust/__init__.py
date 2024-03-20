@@ -20,6 +20,7 @@ import poltergust_luigi_utils.gcs_opener
 import fnmatch
 
 DB_URL = os.environ.get("DB_URL")
+ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
 TAG = r"{{POLTERGUST_PIP}}"
 
 def strnow():
@@ -81,24 +82,27 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                archived_env = zip_dir(self.envdir().path, self.log)
-                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
+#                archived_env = zip_dir(self.envdir().path, self.log)
+#                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
 
 
     def envdir(self):
         return luigi.local_target.LocalTarget(
-            os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/")))
+            os.path.join(ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/")))
 
     def logfile(self):
         return luigi.contrib.opener.OpenerTarget("%s.%s.log.txt" % (self.path, self.hostname))
             
     def output(self):
         return luigi.local_target.LocalTarget(
-            os.path.join("/tmp/environments", self.path.replace("://", "/").lstrip("/"), "done"))
-        
+            os.path.join(ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/"), "done"))
+
+def get_scheduler_url(task):
+    return task.set_progress_percentage.__self__._scheduler._url
+    
 class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
-    hostname = luigi.Parameter()
+    hostname = luigi.Parameter(significant=False, visibility=luigi.parameter.ParameterVisibility.HIDDEN)
     retry_on_error = luigi.Parameter(default=False)
     
     @property
@@ -107,7 +111,7 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
 
     @property
     def scheduler_url(self):
-        return self.scheduler._url
+        return get_scheduler_url(self)
     
     def run(self):
         with self.logging(self.retry_on_error):
@@ -221,10 +225,21 @@ class RunTasks(luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
 
+    @property
+    def scheduler_url(self):
+        return get_scheduler_url(self)
+
     def run(self):
         while True:
-            yield [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
+            tasks = [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
                    for path in list_wildcard(self.output().fs, '%s/*.config.yaml' % (self.path,))]
+            print("=============================================")
+            print(tasks)
+            for task in tasks:
+                res = luigi.build([task], scheduler_url=self.scheduler_url, detailed_summary=True)
+                print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+                print(res.summary_text)
+                print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
             time.sleep(1)
     
     def output(self):

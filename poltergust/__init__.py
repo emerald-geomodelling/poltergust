@@ -82,8 +82,8 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-#                archived_env = zip_dir(self.envdir().path, self.log)
-#                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
+                archived_env = zip_dir(self.envdir().path, self.log)
+                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
 
 
     def envdir(self):

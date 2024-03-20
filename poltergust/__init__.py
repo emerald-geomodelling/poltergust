@@ -239,7 +239,11 @@ class TestTask(luigi.Task):
     time = luigi.Parameter()
     
     def run(self):
-        time.sleep(int(self.time))
+        t = int(self.time)
+        for x in range(t):
+            self.set_progress_percentage(100 * x / t)
+            time.sleep(1)
+        
         with self.output().open("w") as f:
             f.write("DONE")        
 

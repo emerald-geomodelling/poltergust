@@ -95,6 +95,18 @@ is run on multiple nodes: the first one to mark the task as done
 renames the file). If the task fails, the config file is instead
 renamed to `gs://mybucket/pipeline/mypipeline.error.yaml`
 
+## Task notification
+
+```
+services:
+  poltergust:
+    environment:
+      - DB_URL=http://uiserver:8000/update
+```
+
+If you provide the optional environment variable `DB_URL`, a GET request will be made to it when any task finishes.
+It will be called with a query parameter `pipeline_url` with the pipeline url of the task.
+
 ## Instantiating the task runner manually on a single machine
 
 ```

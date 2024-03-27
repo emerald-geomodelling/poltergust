@@ -7,6 +7,7 @@ import sys
 import traceback
 import zipfile
 import luigi
+import luigi.contrib.opener
 import luigi.local_target
 import pieshell
 import traceback
@@ -57,7 +58,8 @@ def download_environment(envpath, path, log):
         if not os.path.exists(envdir):
             os.makedirs(envdir)
 
-    with poltergust_luigi_utils.client.download(path) as z:
+    fs = luigi.contrib.opener.OpenerTarget(path).fs
+    with fs.download(path) as z:
         with zipfile.ZipFile(z, mode="r") as arc:
             arc.extractall(envpath)
         log(arc.printdir())
@@ -71,19 +73,18 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
     def run(self):
         with self.logging(self.retry_on_error):
             zip_path = str(self.path) + ".zip"
-            # if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
             if luigi.contrib.opener.OpenerTarget(zip_path).exists():
                 download_environment(self.envdir().path, zip_path, self.log)
             else:
                 with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader)
-                    #environment = parse_config(f)
                     print(environment)
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                archived_env = zip_dir(self.envdir().path, self.log)
-                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
+                archived_environment = zip_dir(self.envdir().path, self.log)
+                fs = luigi.contrib.opener.OpenerTarget(self.path).fs
+                fs.put(archived_environment, zip_path)
 
 
     def envdir(self):

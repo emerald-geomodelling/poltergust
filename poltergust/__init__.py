@@ -42,14 +42,20 @@ def make_environment(envpath, environment, log):
             log(line)
 
 
-def zip_dir(envdir, log):
-    archive = envdir + ".zip"
-    envdir = Path(envdir)
+def zip_environment(envpath, log):
+    archive = envpath + ".zip"
+    envdir = Path(envpath)
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
         for file in envdir.rglob('*'):
             f.write(file, arcname=file.relative_to(envdir))
     log("Zipped: {}".format(archive))
     return archive
+
+
+def extract_environment(z, envpath, log):
+    with zipfile.ZipFile(z, mode="r") as arc:
+        arc.extractall(envpath)
+    log(arc.printdir())
 
 
 def download_environment(envpath, path, log):
@@ -62,8 +68,6 @@ def download_environment(envpath, path, log):
     with fs.download(path) as z:
         with zipfile.ZipFile(z, mode="r") as arc:
             arc.extractall(envpath)
-        log(arc.printdir())
-
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
@@ -82,9 +86,10 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                archived_environment = zip_dir(self.envdir().path, self.log)
+
+                archive = zip_environment(self.envdir().path, self.log)
                 fs = luigi.contrib.opener.OpenerTarget(self.path).fs
-                fs.put(archived_environment, zip_path)
+                fs.put(archive, zip_path)
 
 
     def envdir(self):

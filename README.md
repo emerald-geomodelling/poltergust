@@ -116,6 +116,19 @@ while true; do
 done
 ```
 
+## Running multiple replicas
+If running mulitple docker service replicas, you have the option to download a virtual environment from GCS instead of builing from scratch. This can save time but make note of that in order to work, the machines runnings the replicas have to be exactly the same. the following environment variables control this behaviour:
+
+- `DOWNLOAD_ENVIRONMENT`
+- `UPLOAD_ENVIRONMENT`
+
+Both of them are set to False by default.
+
+Other environment variables used by poltergust:
+- `ENVIRONMENTS_DIR`, directory to store virtual environments
+- `GITHUB_TOKEN_EMRLD`, Github token to pip install from emerald private repos
+
+
 ## Creating a cluster
 
 ### Google DataProc

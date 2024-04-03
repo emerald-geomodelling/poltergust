@@ -7,6 +7,7 @@ import sys
 import traceback
 import zipfile
 import luigi
+import luigi.contrib.opener
 import luigi.local_target
 import pieshell
 import traceback
@@ -21,6 +22,8 @@ import fnmatch
 
 DB_URL = os.environ.get("DB_URL")
 ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
+DOWNLOAD_ENVIRONMENT = os.environ.get("DOWNLOAD_ENVIRONMENT", False)
+UPLOAD_ENVIRONMENT = os.environ.get("UPLOAD_ENVIRONMENT", False)
 TAG = r"{{POLTERGUST_PIP}}"
 
 def strnow():
@@ -41,9 +44,23 @@ def make_environment(envpath, environment, log):
             log(line)
 
 
-def zip_dir(envdir, log):
-    archive = envdir + ".zip"
-    envdir = Path(envdir)
+def zip_environment(envpath, log):
+    """
+    Create a zip compression level 6 archive of a python virtualenv
+    Note that zipping virtualenvs is not recommended according to PEP405:
+        "Not considered as movable or copyable – you just recreate the 
+        same environment in the target location"
+
+    However, this will work if the two execution environments are "exactly"
+    the same
+
+    @Args:
+        envpath: local path to the virtualenv directory
+    @Returns:
+        archive: name of the zipped archive
+    """
+    archive = envpath + ".zip"
+    envdir = Path(envpath)
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as f:
         for file in envdir.rglob('*'):
             f.write(file, arcname=file.relative_to(envdir))
@@ -52,16 +69,22 @@ def zip_dir(envdir, log):
 
 
 def download_environment(envpath, path, log):
+    """
+    Download a python virtualenv and extract it
+    @Args
+        envpath: local path to the virtualenv directory
+        path: path to downloadable virtualenv (GCS/local disk)
+        log: luigi logger
+    """
     if not os.path.exists(envpath):
         envdir = os.path.dirname(envpath)
         if not os.path.exists(envdir):
             os.makedirs(envdir)
 
-    with poltergust_luigi_utils.client.download(path) as z:
+    fs = luigi.contrib.opener.OpenerTarget(path).fs
+    with fs.download(path) as z:
         with zipfile.ZipFile(z, mode="r") as arc:
             arc.extractall(envpath)
-        log(arc.printdir())
-
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
@@ -71,19 +94,20 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
     def run(self):
         with self.logging(self.retry_on_error):
             zip_path = str(self.path) + ".zip"
-            # if poltergust_luigi_utils.gcs_opener.client.exists(zip_path):
-            if luigi.contrib.opener.OpenerTarget(zip_path).exists():
-                download_environment(self.envdir().path, zip_path, self.log)
+            if DOWNLOAD_ENVIRONMENT:
+                if luigi.contrib.opener.OpenerTarget(zip_path).exists():
+                    download_environment(self.envdir().path, zip_path, self.log)
             else:
                 with luigi.contrib.opener.OpenerTarget(self.path).open("r") as f:
                     environment = yaml.load(f, Loader=yaml.SafeLoader)
-                    #environment = parse_config(f)
                     print(environment)
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                archived_env = zip_dir(self.envdir().path, self.log)
-                poltergust_luigi_utils.gcs_opener.client.put(archived_env, zip_path)
+                if UPLOAD_ENVIRONMENT:
+                    archive = zip_environment(self.envdir().path, self.log)
+                    fs = luigi.contrib.opener.OpenerTarget(self.path).fs
+                    fs.put(archive, zip_path)
 
 
     def envdir(self):

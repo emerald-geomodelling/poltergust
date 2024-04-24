@@ -20,6 +20,7 @@ import poltergust_luigi_utils.logging_task
 import poltergust_luigi_utils.gcs_opener
 import fnmatch
 import psutil
+import signal
 
 DB_URL = os.environ.get("DB_URL")
 ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
@@ -88,26 +89,25 @@ def download_environment(envpath, path, log):
             arc.extractall(envpath)
 
 
-def kill_task(pid):
-    try:
-        parent = psutil.Process(pid)
-        children = parent.children(recursive=True)
+def kill_proc_tree(pid, sig=signal.SIGTERM):
+    # assert pid != os.getpid(), "Not me!"
+    parent = psutil.Process(pid)
+    children = parent.children(recursive=True)
+    children.append(parent)
 
-        for child in children:
-            try:
-                child.kill()
-            except psutil.NoSuchProcess:
-                continue
-    except psutil.NoSuchProcess:
-        return f"No process found: {pid}"
-
-    return f"Process: {pid} killed!"
-
+    for proc in children:
+        try:
+            proc.send_signal(sig)
+        except psutil.NoSuchProcess:
+            pass
+    gone, alive = psutil.wait_procs(children, timeout=5)
+    for p in alive:
+        p.kill()
 
 
 class KillTask(luigi.Task):
     accepts_messages = True
-    # scheduler_url = "http://scheduler:8082"
+    #priority = 10
 
     def run(self):
         while True:
@@ -116,16 +116,15 @@ class KillTask(luigi.Task):
                 content = msg.content
                 if content.startswith("terminate"):
                     pid = content.split(":")[-1]
-                    ret = kill_task(int(pid))
-                    msg.respond(ret)
+                    assert pid != os.getpid(), msg.respond("Not me!")
+                    kill_proc_tree(int(pid), sig=signal.SIGTERM)
+                    msg.respond(f"Killed: {pid}")
                 else:
-                    msg.respond("unknown message")
+                    msg.respond("Unknown message!")
                 time.sleep(1)
                 
     def output(self):
         return luigi.local_target.LocalTarget('killed_tasks.pid')
-    
-
 
 
 
@@ -316,6 +315,7 @@ class RunTasks(luigi.Task):
 
 # luigi --module emerald_algorithms_evaluation.luigi Pipeline --param-evaluation_name=test-luigi-redhog-1
 
+import random
 class TestTask(luigi.Task):
     name = luigi.Parameter()
     time = luigi.Parameter()

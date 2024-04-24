@@ -19,6 +19,7 @@ import poltergust_luigi_utils # Add GCS luigi opener
 import poltergust_luigi_utils.logging_task
 import poltergust_luigi_utils.gcs_opener
 import fnmatch
+import psutil
 
 DB_URL = os.environ.get("DB_URL")
 ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
@@ -85,6 +86,48 @@ def download_environment(envpath, path, log):
     with fs.download(path) as z:
         with zipfile.ZipFile(z, mode="r") as arc:
             arc.extractall(envpath)
+
+
+def kill_task(pid):
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+
+        for child in children:
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                continue
+    except psutil.NoSuchProcess:
+        return f"No process found: {pid}"
+
+    return f"Process: {pid} killed!"
+
+
+
+class KillTask(luigi.Task):
+    accepts_messages = True
+    # scheduler_url = "http://scheduler:8082"
+
+    def run(self):
+        while True:
+            if not self.scheduler_messages.empty():
+                msg = self.scheduler_messages.get()
+                content = msg.content
+                if content.startswith("terminate"):
+                    pid = content.split(":")[-1]
+                    ret = kill_task(int(pid))
+                    msg.respond(ret)
+                else:
+                    msg.respond("unknown message")
+                time.sleep(1)
+                
+    def output(self):
+        return luigi.local_target.LocalTarget('killed_tasks.pid')
+    
+
+
+
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
     path = luigi.Parameter()
@@ -257,13 +300,13 @@ class RunTasks(luigi.Task):
         while True:
             tasks = [RunTask(path=path.replace(".config.yaml", ""), hostname=self.hostname)
                    for path in list_wildcard(self.output().fs, '%s/*.config.yaml' % (self.path,))]
-            print("=============================================")
-            print(tasks)
+            #print("=============================================")
+            #print(tasks)
             for task in tasks:
                 res = luigi.build([task], scheduler_url=self.scheduler_url, detailed_summary=True)
-                print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-                print(res.summary_text)
-                print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+                #print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+                #print(res.summary_text)
+                #print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
             time.sleep(1)
     
     def output(self):
@@ -282,9 +325,11 @@ class TestTask(luigi.Task):
         for x in range(t):
             self.set_progress_percentage(100 * x / t)
             time.sleep(1)
+            print("¯\_( ͡° ͜ʖ ͡°)_/¯\n")
         
         with self.output().open("w") as f:
             f.write("DONE")        
 
     def output(self):
         return luigi.contrib.opener.OpenerTarget(self.name)
+

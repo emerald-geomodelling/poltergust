@@ -12,39 +12,56 @@ import requests
 import poltergust_luigi_utils # Add GCS luigi opener
 import poltergust_luigi_utils.logging_task
 import poltergust_luigi_utils.gcs_opener
-import fnmatch
+import signal
+# from multiprocessing import Queue
+import queue as Queue
+from multiprocessing import Event
 
-from .lib import *
+from .lib import Config
+from .lib import (
+    strnow,
+    make_environment,
+    download_environment,
+    kill_proc_tree,
+    zip_environment,
+    remove_config_from_pipeline,
+    list_wildcard,
+)
 
-class KillTask(luigi.Task, poltergust_luigi_utils.logging_task.LoggingTask):
+
+class KillTask(luigi.Task):
     accepts_messages = True
-    #priority = 10
+    shutdown_event = Event()
 
     def run(self):
-        while True:
-            if not self.scheduler_messages.empty():
-                msg = self.scheduler_messages.get()
+        while not self.shutdown_event.is_set():
+            try:
+                msg = self.scheduler_messages.get(block=True, timeout=0.05)
                 content = msg.content
+                if content == "END":
+                    break
                 if content.startswith("kill"):
-                    args = content.split(":")
-                    pid = args[1]
-                    assert pid != os.getpid(), msg.respond("Not me!")
+                    argv = content.split(",")
+                    pid = int(argv[0].split("=")[1])
+                    if pid == os.getpid():
+                        msg.respond("Not me!")
+                        continue
 
-                    cfg = args[2]
-                    status = remove_config_from_pipeline(cfg)
-                    msg.respond(status)
+                    if len(argv) == 2:
+                        cfg = argv[1].split("=")[1]
+                        status = remove_config_from_pipeline(cfg)
+                        print(status)
 
                     gone = kill_proc_tree(int(pid), sig=signal.SIGTERM)
-                    print(gone)
-                    self.log(gone)
+                    print(f"[X] {gone}")
                     msg.respond(f"Killed: {pid}")
                 else:
                     msg.respond("Unknown message!")
-                time.sleep(1)
-                
+            except Queue.Empty:
+                continue
+                            
     def output(self):
         return luigi.local_target.LocalTarget('killed_tasks.pid')
-
 
 
 class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
@@ -55,7 +72,7 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
     def run(self):
         with self.logging(self.retry_on_error):
             zip_path = str(self.path) + ".zip"
-            if DOWNLOAD_ENVIRONMENT:
+            if Config.DOWNLOAD_ENVIRONMENT:
                 if luigi.contrib.opener.OpenerTarget(zip_path).exists():
                     download_environment(self.envdir().path, zip_path, self.log)
             else:
@@ -65,7 +82,7 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
                     make_environment(self.envdir().path, environment, self.log)
                     with self.output().open("w") as f:
                         f.write("DONE")        
-                if UPLOAD_ENVIRONMENT:
+                if Config.UPLOAD_ENVIRONMENT:
                     archive = zip_environment(self.envdir().path, self.log)
                     fs = luigi.contrib.opener.OpenerTarget(self.path).fs
                     fs.put(archive, zip_path)
@@ -73,14 +90,14 @@ class MakeEnvironment(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Tas
 
     def envdir(self):
         return luigi.local_target.LocalTarget(
-            os.path.join(ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/")))
+            os.path.join(Config.ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/")))
 
     def logfile(self):
         return luigi.contrib.opener.OpenerTarget("%s.%s.log.txt" % (self.path, self.hostname))
             
     def output(self):
         return luigi.local_target.LocalTarget(
-            os.path.join(ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/"), "done"))
+            os.path.join(Config.ENVIRONMENTS_DIR, self.path.replace("://", "/").lstrip("/"), "done"))
 
 def get_scheduler_url(task):
     return task.set_progress_percentage.__self__._scheduler._url
@@ -187,8 +204,8 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
             # Might already have been moved by another node...
             pass
 
-        if DB_URL is not None:
-            r = requests.get(DB_URL, params={"pipeline_url": self.path})
+        if Config.DB_URL is not None:
+            r = requests.get(Config.DB_URL, params={"pipeline_url": self.path})
             if r.status_code != 200:
                 print("Unable to update status", r.status_code, r.text)
         
@@ -199,13 +216,8 @@ class RunTask(poltergust_luigi_utils.logging_task.LoggingTask, luigi.Task):
          return luigi.contrib.opener.OpenerTarget(
              '%s.done.yaml' % (self.path,))
 
-def list_wildcard(fs, path):
-    if hasattr(fs, "list_wildcard"):
-        return fs.list_wildcard(path)
-    else:
-        dirpath, pattern = path.rsplit("/", 1)
-        return fnmatch.filter(fs.listdir(dirpath), path) 
         
+
 class RunTasks(luigi.Task):
     path = luigi.Parameter()
     hostname = luigi.Parameter()
@@ -233,7 +245,6 @@ class RunTasks(luigi.Task):
     
 
 
-import random
 class TestTask(luigi.Task):
     name = luigi.Parameter()
     time = luigi.Parameter()
@@ -243,7 +254,7 @@ class TestTask(luigi.Task):
         for x in range(t):
             self.set_progress_percentage(100 * x / t)
             time.sleep(1)
-            print("¯\_( ͡° ͜ʖ ͡°)_/¯\n")
+            print(x)
         
         with self.output().open("w") as f:
             f.write("DONE")        

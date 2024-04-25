@@ -10,25 +10,46 @@ import pieshell
 import datetime
 import psutil
 import signal
+import fnmatch
 
-DB_URL = os.environ.get("DB_URL")
-ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
-DOWNLOAD_ENVIRONMENT = os.environ.get("DOWNLOAD_ENVIRONMENT", False)
-UPLOAD_ENVIRONMENT = os.environ.get("UPLOAD_ENVIRONMENT", False)
-TAG = r"{{POLTERGUST_PIP}}"
-PIPELINE_URL = os.environ.get("PIPELINE_URL")
+
+class Config:
+    DB_URL = os.environ.get("DB_URL")
+    ENVIRONMENTS_DIR = os.environ.get("ENVIRONMENTS_DIR", "/tmp/environments")
+    DOWNLOAD_ENVIRONMENT = os.environ.get("DOWNLOAD_ENVIRONMENT", False)
+    UPLOAD_ENVIRONMENT = os.environ.get("UPLOAD_ENVIRONMENT", False)
+    PIPELINE_URL = os.environ.get("PIPELINE_URL", "")
+    TAG = r"{{POLTERGUST_PIP}}"
 
 
 def strnow():
     return datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f")
 
-def make_environment(envpath, environment, log):
-    _ = pieshell.env(exports=dict(pieshell.env._exports))
+
+def makedirs_recursive(envpath):
     if not os.path.exists(envpath):
         envdir = os.path.dirname(envpath)
         if not os.path.exists(envdir):
             os.makedirs(envdir)
-        +_.virtualenv(envpath, **environment.get("virtualenv", {}))
+    return envpath
+
+
+def list_wildcard(fs, path):
+    if hasattr(fs, "list_wildcard"):
+        return fs.list_wildcard(path)
+    else:
+        dirpath, pattern = path.rsplit("/", 1)
+        return fnmatch.filter(fs.listdir(dirpath), path) 
+
+
+def make_environment(envpath, environment, log):
+    _ = pieshell.env(exports=dict(pieshell.env._exports))
+    # if not os.path.exists(envpath):
+    #     envdir = os.path.dirname(envpath)
+    #     if not os.path.exists(envdir):
+    #         os.makedirs(envdir)
+    makedirs_recursive(envpath)
+    +_.virtualenv(envpath, **environment.get("virtualenv", {}))
     +_.bashsource(envpath + "/bin/activate")
     for dep in environment["dependencies"]:
         if TAG in dep:
@@ -69,11 +90,7 @@ def download_environment(envpath, path, log):
         path: path to downloadable virtualenv (GCS/local disk)
         log: luigi logger
     """
-    if not os.path.exists(envpath):
-        envdir = os.path.dirname(envpath)
-        if not os.path.exists(envdir):
-            os.makedirs(envdir)
-
+    makedirs_recursive(envpath)
     fs = luigi.contrib.opener.OpenerTarget(path).fs
     with fs.download(path) as z:
         with zipfile.ZipFile(z, mode="r") as arc:
@@ -103,22 +120,30 @@ def kill_proc_tree(pid, sig=signal.SIGTERM, timeout=5):
     return gone
 
 
-def remove_config_from_pipeline(cfg):
+def rename_file(src, dst):
+    fs = luigi.contrib.opener.OpenerTarget(src).fs
+    if fs.exists(src):
+        try:
+            fs.move(src, dst)
+        except:
+            pass
+        finally:
+            return f"{src} moved to {dst}"
+    else:
+        return f"not exists!: {src}"
+
+
+def remove_config_from_pipeline(cfg, dst=None, gcs=True):
     cfg_src = cfg + ".config.yaml"
     cfg_dst = cfg + ".done.yaml"
 
-    fs = luigi.contrib.opener.OpenerTarget(cfg_src).fs
-    if PIPELINE_URL:
-        full_cfg_path = PIPELINE_URL + "/" + cfg_src
-        if fs.exists(full_cfg_path):
-            try:
-                fs.move(full_cfg_path, cfg_dst)
-            except:
-                pass
-            finally:
-                return f"{full_cfg_path} moved!"
-        else:
-            return f"not exists!: {full_cfg_path}"
-    return "PIPELINE_URL not found!"
+    if not Config.PIPELINE_URL.startswith("gs://"):
+        return f"GCS PIPELINE_URL not found!, {Config.PIPELINE_URL}"
 
+    full_cfg_path = Config.PIPELINE_URL + "/" + cfg_src
+    full_dst_path = Config.PIPELINE_URL + "/" + cfg_dst
+    ret = rename_file(full_cfg_path, full_dst_path)
+    return ret
+    # ret = rename_file(cfg, dst)
+    # return ret
 
